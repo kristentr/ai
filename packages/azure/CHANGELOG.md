@@ -1,5 +1,121 @@
 # @ai-sdk/azure
 
+## 3.0.0-beta.72
+
+### Patch Changes
+
+- Updated dependencies [457318b]
+  - @ai-sdk/provider@3.0.0-beta.20
+  - @ai-sdk/openai@3.0.0-beta.70
+  - @ai-sdk/provider-utils@4.0.0-beta.37
+
+## 3.0.0-beta.71
+
+### Patch Changes
+
+- Updated dependencies [1d0de66]
+  - @ai-sdk/openai@3.0.0-beta.69
+
+## 3.0.0-beta.70
+
+### Patch Changes
+
+- 8d9e8ad: chore(provider): remove generics from EmbeddingModelV3
+
+  Before
+
+  ```ts
+  model.textEmbeddingModel('my-model-id');
+  ```
+
+  After
+
+  ```ts
+  model.embeddingModel('my-model-id');
+  ```
+
+- Updated dependencies [8d9e8ad]
+  - @ai-sdk/provider@3.0.0-beta.19
+  - @ai-sdk/openai@3.0.0-beta.68
+  - @ai-sdk/provider-utils@4.0.0-beta.36
+
+## 3.0.0-beta.69
+
+### Patch Changes
+
+- Updated dependencies [10d819b]
+  - @ai-sdk/provider@3.0.0-beta.18
+  - @ai-sdk/openai@3.0.0-beta.67
+  - @ai-sdk/provider-utils@4.0.0-beta.35
+
+## 3.0.0-beta.68
+
+### Patch Changes
+
+- d86b52f: distinguish between OpenAI and Azure in Responses API providerMetadata
+- Updated dependencies [d86b52f]
+  - @ai-sdk/openai@3.0.0-beta.66
+
+## 3.0.0-beta.67
+
+### Patch Changes
+
+- Updated dependencies [38a4035]
+  - @ai-sdk/openai@3.0.0-beta.65
+
+## 3.0.0-beta.66
+
+### Patch Changes
+
+- Updated dependencies [db913bd]
+  - @ai-sdk/provider@3.0.0-beta.17
+  - @ai-sdk/openai@3.0.0-beta.64
+  - @ai-sdk/provider-utils@4.0.0-beta.34
+
+## 3.0.0-beta.65
+
+### Patch Changes
+
+- 423ba08: Set the annotations from the Responses API to doStream
+- Updated dependencies [423ba08]
+  - @ai-sdk/openai@3.0.0-beta.63
+
+## 3.0.0-beta.64
+
+### Patch Changes
+
+- 64aa48f: Azure OpenAI enabled web-search-preview
+- Updated dependencies [64aa48f]
+  - @ai-sdk/openai@3.0.0-beta.62
+
+## 3.0.0-beta.63
+
+### Patch Changes
+
+- Updated dependencies [23f132b]
+  - @ai-sdk/openai@3.0.0-beta.61
+
+## 3.0.0-beta.62
+
+### Patch Changes
+
+- Updated dependencies [0877683]
+  - @ai-sdk/openai@3.0.0-beta.60
+
+## 3.0.0-beta.61
+
+### Patch Changes
+
+- Updated dependencies [d0f1baf]
+  - @ai-sdk/openai@3.0.0-beta.59
+
+## 3.0.0-beta.60
+
+### Patch Changes
+
+- Updated dependencies [79b4e46]
+  - @ai-sdk/openai@3.0.0-beta.58
+
 ## 3.0.0-beta.59
 
 ### Patch Changes
