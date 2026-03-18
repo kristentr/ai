@@ -41,6 +41,7 @@ export const uiMessageChunkSchema = lazySchema(() =>
         toolCallId: z.string(),
         toolName: z.string(),
         providerExecuted: z.boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
         dynamic: z.boolean().optional(),
         title: z.string().optional(),
       }),
@@ -80,6 +81,7 @@ export const uiMessageChunkSchema = lazySchema(() =>
         toolCallId: z.string(),
         output: z.unknown(),
         providerExecuted: z.boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
         dynamic: z.boolean().optional(),
         preliminary: z.boolean().optional(),
       }),
@@ -88,6 +90,7 @@ export const uiMessageChunkSchema = lazySchema(() =>
         toolCallId: z.string(),
         errorText: z.string(),
         providerExecuted: z.boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
         dynamic: z.boolean().optional(),
       }),
       z.strictObject({
@@ -132,6 +135,12 @@ export const uiMessageChunkSchema = lazySchema(() =>
         providerMetadata: providerMetadataSchema.optional(),
       }),
       z.strictObject({
+        type: z.literal('reasoning-file'),
+        url: z.string(),
+        mediaType: z.string(),
+        providerMetadata: providerMetadataSchema.optional(),
+      }),
+      z.strictObject({
         type: z.custom<`data-${string}`>(
           (value): value is `data-${string}` =>
             typeof value === 'string' && value.startsWith('data-'),
@@ -162,13 +171,13 @@ export const uiMessageChunkSchema = lazySchema(() =>
             'tool-calls',
             'error',
             'other',
-            'unknown',
           ] as const satisfies readonly FinishReason[])
           .optional(),
         messageMetadata: z.unknown().optional(),
       }),
       z.strictObject({
         type: z.literal('abort'),
+        reason: z.string().optional(),
       }),
       z.strictObject({
         type: z.literal('message-metadata'),
@@ -258,6 +267,7 @@ export type UIMessageChunk<
       toolCallId: string;
       output: unknown;
       providerExecuted?: boolean;
+      providerMetadata?: ProviderMetadata;
       dynamic?: boolean;
       preliminary?: boolean;
     }
@@ -266,6 +276,7 @@ export type UIMessageChunk<
       toolCallId: string;
       errorText: string;
       providerExecuted?: boolean;
+      providerMetadata?: ProviderMetadata;
       dynamic?: boolean;
     }
   | {
@@ -277,6 +288,7 @@ export type UIMessageChunk<
       toolCallId: string;
       toolName: string;
       providerExecuted?: boolean;
+      providerMetadata?: ProviderMetadata;
       dynamic?: boolean;
       title?: string;
     }
@@ -306,6 +318,12 @@ export type UIMessageChunk<
       mediaType: string;
       providerMetadata?: ProviderMetadata;
     }
+  | {
+      type: 'reasoning-file';
+      url: string;
+      mediaType: string;
+      providerMetadata?: ProviderMetadata;
+    }
   | DataUIMessageChunk<DATA_TYPES>
   | {
       type: 'start-step';
@@ -325,6 +343,7 @@ export type UIMessageChunk<
     }
   | {
       type: 'abort';
+      reason?: string;
     }
   | {
       type: 'message-metadata';

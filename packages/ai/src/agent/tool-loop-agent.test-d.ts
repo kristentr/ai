@@ -1,17 +1,43 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import { Output } from '../generate-text';
-import { MockLanguageModelV3 } from '../test/mock-language-model-v3';
-import { ToolLoopAgent } from './tool-loop-agent';
+import { Output, StreamTextOnFinishCallback } from '../generate-text';
+import { MockLanguageModelV4 } from '../test/mock-language-model-v4';
 import { AsyncIterableStream } from '../util/async-iterable-stream';
 import { DeepPartial } from '../util/deep-partial';
-import { ModelMessage } from '../prompt';
+import { AgentCallParameters, AgentStreamParameters } from './agent';
+import { ToolLoopAgent } from './tool-loop-agent';
+import type { ToolLoopAgentOnFinishCallback } from './tool-loop-agent-settings';
 
 describe('ToolLoopAgent', () => {
+  describe('onFinish callback type compatibility', () => {
+    it('should allow StreamTextOnFinishCallback where ToolLoopAgentOnFinishCallback is expected', () => {
+      const streamTextCallback: StreamTextOnFinishCallback<{}> =
+        async event => {
+          const context: unknown = event.experimental_context;
+          context;
+        };
+
+      expectTypeOf(streamTextCallback).toMatchTypeOf<
+        ToolLoopAgentOnFinishCallback<{}>
+      >();
+    });
+
+    it('should allow ToolLoopAgentOnFinishCallback where StreamTextOnFinishCallback is expected', () => {
+      const agentCallback: ToolLoopAgentOnFinishCallback<{}> = async event => {
+        const context: unknown = event.experimental_context;
+        context;
+      };
+
+      expectTypeOf(agentCallback).toMatchTypeOf<
+        StreamTextOnFinishCallback<{}>
+      >();
+    });
+  });
+
   describe('generate', () => {
     it('should not allow system prompt', async () => {
       const agent = new ToolLoopAgent({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
       });
 
       await agent.generate({
@@ -23,33 +49,27 @@ describe('ToolLoopAgent', () => {
 
     it('should require options when call options are provided', async () => {
       const agent = new ToolLoopAgent<{ callOption: string }>({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
       });
 
       expectTypeOf<Parameters<typeof agent.generate>[0]>().toEqualTypeOf<
-        { options: { callOption: string } } & (
-          | { prompt: string | ModelMessage[]; messages?: never }
-          | { messages: ModelMessage[]; prompt?: never }
-        )
+        AgentCallParameters<{ callOption: string }>
       >();
     });
 
     it('should not require options when call options are not provided', async () => {
       const agent = new ToolLoopAgent({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
       });
 
       expectTypeOf<Parameters<typeof agent.generate>[0]>().toEqualTypeOf<
-        { options?: never } & (
-          | { prompt: string | ModelMessage[]; messages?: never }
-          | { messages: ModelMessage[]; prompt?: never }
-        )
+        AgentCallParameters<never>
       >();
     });
 
     it('should infer output type', async () => {
       const agent = new ToolLoopAgent({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
         output: Output.object({
           schema: z.object({ value: z.string() }),
         }),
@@ -68,7 +88,7 @@ describe('ToolLoopAgent', () => {
   describe('stream', () => {
     it('should not allow system prompt', () => {
       const agent = new ToolLoopAgent({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
       });
 
       agent.stream({
@@ -80,33 +100,27 @@ describe('ToolLoopAgent', () => {
 
     it('should require options when call options are provided', async () => {
       const agent = new ToolLoopAgent<{ callOption: string }>({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
       });
 
       expectTypeOf<Parameters<typeof agent.stream>[0]>().toEqualTypeOf<
-        { options: { callOption: string } } & (
-          | { prompt: string | ModelMessage[]; messages?: never }
-          | { messages: ModelMessage[]; prompt?: never }
-        )
+        AgentStreamParameters<{ callOption: string }, {}>
       >();
     });
 
     it('should not require options when call options are not provided', async () => {
       const agent = new ToolLoopAgent({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
       });
 
       expectTypeOf<Parameters<typeof agent.stream>[0]>().toEqualTypeOf<
-        { options?: never } & (
-          | { prompt: string | ModelMessage[]; messages?: never }
-          | { messages: ModelMessage[]; prompt?: never }
-        )
+        AgentStreamParameters<never, {}>
       >();
     });
 
     it('should infer output type', async () => {
       const agent = new ToolLoopAgent({
-        model: new MockLanguageModelV3(),
+        model: new MockLanguageModelV4(),
         output: Output.object({
           schema: z.object({ value: z.string() }),
         }),
