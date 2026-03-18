@@ -1,6 +1,8 @@
 import {
   GroundingMetadataSchema,
+  PromptFeedbackSchema,
   UrlContextMetadataSchema,
+  UsageMetadataSchema,
 } from './google-generative-ai-language-model';
 import { type SafetyRatingSchema } from './google-generative-ai-language-model';
 
@@ -19,9 +21,9 @@ export type GoogleGenerativeAIContent = {
 };
 
 export type GoogleGenerativeAIContentPart =
-  | { text: string }
+  | { text: string; thought?: boolean; thoughtSignature?: string }
   | { inlineData: { mimeType: string; data: string } }
-  | { functionCall: { name: string; args: unknown } }
+  | { functionCall: { name: string; args: unknown }; thoughtSignature?: string }
   | { functionResponse: { name: string; response: unknown } }
   | { fileData: { mimeType: string; fileUri: string } };
 
@@ -31,8 +33,15 @@ export type GoogleGenerativeAIUrlContextMetadata = UrlContextMetadataSchema;
 
 export type GoogleGenerativeAISafetyRating = SafetyRatingSchema;
 
+export type GoogleGenerativeAIPromptFeedback = PromptFeedbackSchema;
+
+export type GoogleGenerativeAIUsageMetadata = UsageMetadataSchema;
+
 export interface GoogleGenerativeAIProviderMetadata {
+  promptFeedback: GoogleGenerativeAIPromptFeedback | null;
   groundingMetadata: GoogleGenerativeAIGroundingMetadata | null;
   urlContextMetadata: GoogleGenerativeAIUrlContextMetadata | null;
   safetyRatings: GoogleGenerativeAISafetyRating[] | null;
+  usageMetadata: GoogleGenerativeAIUsageMetadata | null;
+  finishMessage: string | null;
 }
