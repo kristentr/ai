@@ -1,6 +1,7 @@
 import {
-  TranscriptionModelV3,
-  ProviderV3,
+  TranscriptionModelV4,
+  SpeechModelV4,
+  ProviderV4,
   NoSuchModelError,
 } from '@ai-sdk/provider';
 import {
@@ -10,9 +11,11 @@ import {
 } from '@ai-sdk/provider-utils';
 import { DeepgramTranscriptionModel } from './deepgram-transcription-model';
 import { DeepgramTranscriptionModelId } from './deepgram-transcription-options';
+import { DeepgramSpeechModel } from './deepgram-speech-model';
+import { DeepgramSpeechModelId } from './deepgram-speech-options';
 import { VERSION } from './version';
 
-export interface DeepgramProvider extends ProviderV3 {
+export interface DeepgramProvider extends ProviderV4 {
   (
     modelId: 'nova-3',
     settings?: {},
@@ -21,31 +24,41 @@ export interface DeepgramProvider extends ProviderV3 {
   };
 
   /**
-Creates a model for transcription.
+   * Creates a model for transcription.
    */
-  transcription(modelId: DeepgramTranscriptionModelId): TranscriptionModelV3;
+  transcription(modelId: DeepgramTranscriptionModelId): TranscriptionModelV4;
+
+  /**
+   * Creates a model for speech generation.
+   */
+  speech(modelId: DeepgramSpeechModelId): SpeechModelV4;
+
+  /**
+   * @deprecated Use `embeddingModel` instead.
+   */
+  textEmbeddingModel(modelId: string): never;
 }
 
 export interface DeepgramProviderSettings {
   /**
-API key for authenticating requests.
-     */
+   * API key for authenticating requests.
+   */
   apiKey?: string;
 
   /**
-Custom headers to include in the requests.
-     */
+   * Custom headers to include in the requests.
+   */
   headers?: Record<string, string>;
 
   /**
-Custom fetch implementation. You can use it as a middleware to intercept requests,
-or to provide a custom fetch implementation for e.g. testing.
-    */
+   * Custom fetch implementation. You can use it as a middleware to intercept requests,
+   * or to provide a custom fetch implementation for e.g. testing.
+   */
   fetch?: FetchFunction;
 }
 
 /**
-Create an Deepgram provider instance.
+ * Create an Deepgram provider instance.
  */
 export function createDeepgram(
   options: DeepgramProviderSettings = {},
@@ -71,36 +84,47 @@ export function createDeepgram(
       fetch: options.fetch,
     });
 
+  const createSpeechModel = (modelId: DeepgramSpeechModelId) =>
+    new DeepgramSpeechModel(modelId, {
+      provider: `deepgram.speech`,
+      url: ({ path }) => `https://api.deepgram.com${path}`,
+      headers: getHeaders,
+      fetch: options.fetch,
+    });
+
   const provider = function (modelId: DeepgramTranscriptionModelId) {
     return {
       transcription: createTranscriptionModel(modelId),
     };
   };
 
-  provider.specificationVersion = 'v3' as const;
+  provider.specificationVersion = 'v4' as const;
   provider.transcription = createTranscriptionModel;
   provider.transcriptionModel = createTranscriptionModel;
+  provider.speech = createSpeechModel;
+  provider.speechModel = createSpeechModel;
 
-  // Required ProviderV3 methods that are not supported
-  provider.languageModel = () => {
+  // Required ProviderV4 methods that are not supported
+  provider.languageModel = (modelId: string) => {
     throw new NoSuchModelError({
-      modelId: 'unknown',
+      modelId,
       modelType: 'languageModel',
       message: 'Deepgram does not provide language models',
     });
   };
 
-  provider.textEmbeddingModel = () => {
+  provider.embeddingModel = (modelId: string) => {
     throw new NoSuchModelError({
-      modelId: 'unknown',
-      modelType: 'textEmbeddingModel',
+      modelId,
+      modelType: 'embeddingModel',
       message: 'Deepgram does not provide text embedding models',
     });
   };
+  provider.textEmbeddingModel = provider.embeddingModel;
 
-  provider.imageModel = () => {
+  provider.imageModel = (modelId: string) => {
     throw new NoSuchModelError({
-      modelId: 'unknown',
+      modelId,
       modelType: 'imageModel',
       message: 'Deepgram does not provide image models',
     });
@@ -110,6 +134,6 @@ export function createDeepgram(
 }
 
 /**
-Default Deepgram provider instance.
+ * Default Deepgram provider instance.
  */
 export const deepgram = createDeepgram();
