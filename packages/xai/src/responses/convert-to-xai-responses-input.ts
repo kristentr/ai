@@ -1,17 +1,25 @@
-import { SharedV3Warning, LanguageModelV3Message } from '@ai-sdk/provider';
-import { XaiResponsesInput } from './xai-responses-api';
+import {
+  SharedV4Warning,
+  LanguageModelV4Message,
+  UnsupportedFunctionalityError,
+} from '@ai-sdk/provider';
+import { convertToBase64 } from '@ai-sdk/provider-utils';
+import {
+  XaiResponsesInput,
+  XaiResponsesUserMessageContentPart,
+} from './xai-responses-api';
 
 export async function convertToXaiResponsesInput({
   prompt,
 }: {
-  prompt: LanguageModelV3Message[];
+  prompt: LanguageModelV4Message[];
   store?: boolean;
 }): Promise<{
   input: XaiResponsesInput;
-  inputWarnings: SharedV3Warning[];
+  inputWarnings: SharedV4Warning[];
 }> {
   const input: XaiResponsesInput = [];
-  const inputWarnings: SharedV3Warning[] = [];
+  const inputWarnings: SharedV4Warning[] = [];
 
   for (const message of prompt) {
     switch (message.role) {
@@ -24,20 +32,33 @@ export async function convertToXaiResponsesInput({
       }
 
       case 'user': {
-        let userContent = '';
+        const contentParts: XaiResponsesUserMessageContentPart[] = [];
 
         for (const block of message.content) {
           switch (block.type) {
             case 'text': {
-              userContent += block.text;
+              contentParts.push({ type: 'input_text', text: block.text });
               break;
             }
 
             case 'file': {
-              inputWarnings.push({
-                type: 'other',
-                message: `xAI Responses API does not support ${block.type} in user messages`,
-              });
+              if (block.mediaType.startsWith('image/')) {
+                const mediaType =
+                  block.mediaType === 'image/*'
+                    ? 'image/jpeg'
+                    : block.mediaType;
+
+                const imageUrl =
+                  block.data instanceof URL
+                    ? block.data.toString()
+                    : `data:${mediaType};base64,${convertToBase64(block.data)}`;
+
+                contentParts.push({ type: 'input_image', image_url: imageUrl });
+              } else {
+                throw new UnsupportedFunctionalityError({
+                  functionality: `file part media type ${block.mediaType}`,
+                });
+              }
               break;
             }
 
@@ -54,7 +75,7 @@ export async function convertToXaiResponsesInput({
 
         input.push({
           role: 'user',
-          content: userContent,
+          content: contentParts,
         });
         break;
       }
@@ -103,6 +124,7 @@ export async function convertToXaiResponsesInput({
             }
 
             case 'reasoning':
+            case 'reasoning-file':
             case 'file': {
               inputWarnings.push({
                 type: 'other',
@@ -127,6 +149,9 @@ export async function convertToXaiResponsesInput({
 
       case 'tool': {
         for (const part of message.content) {
+          if (part.type === 'tool-approval-response') {
+            continue;
+          }
           const output = part.output;
 
           let outputValue: string;

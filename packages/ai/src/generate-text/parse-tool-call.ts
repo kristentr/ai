@@ -1,4 +1,4 @@
-import { LanguageModelV3ToolCall } from '@ai-sdk/provider';
+import { LanguageModelV4ToolCall } from '@ai-sdk/provider';
 import {
   asSchema,
   ModelMessage,
@@ -20,10 +20,10 @@ export async function parseToolCall<TOOLS extends ToolSet>({
   system,
   messages,
 }: {
-  toolCall: LanguageModelV3ToolCall;
+  toolCall: LanguageModelV4ToolCall;
   tools: TOOLS | undefined;
   repairToolCall: ToolCallRepairFunction<TOOLS> | undefined;
-  system: string | SystemModelMessage | undefined;
+  system: string | SystemModelMessage | Array<SystemModelMessage> | undefined;
   messages: ModelMessage[];
 }): Promise<TypedToolCall<TOOLS>> {
   try {
@@ -49,7 +49,7 @@ export async function parseToolCall<TOOLS extends ToolSet>({
         throw error;
       }
 
-      let repairedToolCall: LanguageModelV3ToolCall | null = null;
+      let repairedToolCall: LanguageModelV4ToolCall | null = null;
 
       try {
         repairedToolCall = await repairToolCall({
@@ -92,12 +92,14 @@ export async function parseToolCall<TOOLS extends ToolSet>({
       invalid: true,
       error,
       title: tools?.[toolCall.toolName]?.title,
+      providerExecuted: toolCall.providerExecuted,
+      providerMetadata: toolCall.providerMetadata,
     };
   }
 }
 
 async function parseProviderExecutedDynamicToolCall(
-  toolCall: LanguageModelV3ToolCall,
+  toolCall: LanguageModelV4ToolCall,
 ): Promise<DynamicToolCall> {
   const parseResult =
     toolCall.input.trim() === ''
@@ -127,7 +129,7 @@ async function doParseToolCall<TOOLS extends ToolSet>({
   toolCall,
   tools,
 }: {
-  toolCall: LanguageModelV3ToolCall;
+  toolCall: LanguageModelV4ToolCall;
   tools: TOOLS;
 }): Promise<TypedToolCall<TOOLS>> {
   const toolName = toolCall.toolName as keyof TOOLS & string;

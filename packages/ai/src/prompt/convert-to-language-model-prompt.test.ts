@@ -75,6 +75,45 @@ describe('convertToLanguageModelPrompt', () => {
         ]
       `);
     });
+
+    it('should convert an array of SystemModelMessage system messages', async () => {
+      const result = await convertToLanguageModelPrompt({
+        prompt: {
+          system: [
+            { role: 'system', content: 'INSTRUCTIONS' },
+            { role: 'system', content: 'INSTRUCTIONS 2' },
+          ],
+          messages: [{ role: 'user', content: 'Hello, world!' }],
+        },
+        supportedUrls: {},
+        download: undefined,
+      });
+
+      expect(result).toMatchInlineSnapshot(`
+        [
+          {
+            "content": "INSTRUCTIONS",
+            "providerOptions": undefined,
+            "role": "system",
+          },
+          {
+            "content": "INSTRUCTIONS 2",
+            "providerOptions": undefined,
+            "role": "system",
+          },
+          {
+            "content": [
+              {
+                "text": "Hello, world!",
+                "type": "text",
+              },
+            ],
+            "providerOptions": undefined,
+            "role": "user",
+          },
+        ]
+      `);
+    });
   });
 
   describe('user message', () => {
@@ -1329,6 +1368,89 @@ describe('convertToLanguageModelMessage', () => {
             },
           ],
         });
+      });
+    });
+
+    describe('reasoning-file parts', () => {
+      it('should convert reasoning-file part with base64 data', () => {
+        const result = convertToLanguageModelMessage({
+          message: {
+            role: 'assistant',
+            content: [
+              {
+                type: 'reasoning-file',
+                data: 'iVBORw0KGgo=',
+                mediaType: 'image/png',
+                providerOptions: {
+                  'test-provider': {
+                    'key-a': 'test-value-1',
+                  },
+                },
+              },
+            ],
+          },
+          downloadedAssets: {},
+        });
+
+        expect(result).toMatchInlineSnapshot(`
+          {
+            "content": [
+              {
+                "data": "iVBORw0KGgo=",
+                "mediaType": "image/png",
+                "providerOptions": {
+                  "test-provider": {
+                    "key-a": "test-value-1",
+                  },
+                },
+                "type": "reasoning-file",
+              },
+            ],
+            "providerOptions": undefined,
+            "role": "assistant",
+          }
+        `);
+      });
+
+      it('should convert reasoning-file part with Uint8Array data', () => {
+        const data = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+        const result = convertToLanguageModelMessage({
+          message: {
+            role: 'assistant',
+            content: [
+              {
+                type: 'reasoning-file',
+                data,
+                mediaType: 'image/png',
+              },
+            ],
+          },
+          downloadedAssets: {},
+        });
+
+        expect(result).toMatchInlineSnapshot(`
+          {
+            "content": [
+              {
+                "data": Uint8Array [
+                  137,
+                  80,
+                  78,
+                  71,
+                  13,
+                  10,
+                  26,
+                  10,
+                ],
+                "mediaType": "image/png",
+                "providerOptions": undefined,
+                "type": "reasoning-file",
+              },
+            ],
+            "providerOptions": undefined,
+            "role": "assistant",
+          }
+        `);
       });
     });
 

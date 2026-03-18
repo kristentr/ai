@@ -1,6 +1,6 @@
 import {
-  LanguageModelV3CallOptions,
-  SharedV3Warning,
+  LanguageModelV4CallOptions,
+  SharedV4Warning,
   UnsupportedFunctionalityError,
 } from '@ai-sdk/provider';
 import { convertJSONSchemaToOpenAPISchema } from './convert-json-schema-to-openapi-schema';
@@ -11,8 +11,8 @@ export function prepareTools({
   toolChoice,
   modelId,
 }: {
-  tools: LanguageModelV3CallOptions['tools'];
-  toolChoice?: LanguageModelV3CallOptions['toolChoice'];
+  tools: LanguageModelV4CallOptions['tools'];
+  toolChoice?: LanguageModelV4CallOptions['toolChoice'];
   modelId: GoogleGenerativeAIModelId;
 }): {
   tools:
@@ -31,16 +31,16 @@ export function prepareTools({
     | undefined
     | {
         functionCallingConfig: {
-          mode: 'AUTO' | 'NONE' | 'ANY';
+          mode: 'AUTO' | 'NONE' | 'ANY' | 'VALIDATED';
           allowedFunctionNames?: string[];
         };
       };
-  toolWarnings: SharedV3Warning[];
+  toolWarnings: SharedV4Warning[];
 } {
   // when the tools array is empty, change it to undefined to prevent errors:
   tools = tools?.length ? tools : undefined;
 
-  const toolWarnings: SharedV3Warning[] = [];
+  const toolWarnings: SharedV4Warning[] = [];
 
   const isLatest = (
     [
@@ -50,10 +50,12 @@ export function prepareTools({
     ] as const satisfies GoogleGenerativeAIModelId[]
   ).some(id => id === modelId);
   const isGemini2orNewer =
-    modelId.includes('gemini-2') || modelId.includes('gemini-3') || isLatest;
-  const supportsDynamicRetrieval =
-    modelId.includes('gemini-1.5-flash') && !modelId.includes('-8b');
-  const supportsFileSearch = modelId.includes('gemini-2.5');
+    modelId.includes('gemini-2') ||
+    modelId.includes('gemini-3') ||
+    modelId.includes('nano-banana') ||
+    isLatest;
+  const supportsFileSearch =
+    modelId.includes('gemini-2.5') || modelId.includes('gemini-3');
 
   if (tools == null) {
     return { tools: undefined, toolConfig: undefined, toolWarnings };
@@ -61,45 +63,41 @@ export function prepareTools({
 
   // Check for mixed tool types and add warnings
   const hasFunctionTools = tools.some(tool => tool.type === 'function');
-  const hasProviderDefinedTools = tools.some(
-    tool => tool.type === 'provider-defined',
-  );
+  const hasProviderTools = tools.some(tool => tool.type === 'provider');
 
-  if (hasFunctionTools && hasProviderDefinedTools) {
+  if (hasFunctionTools && hasProviderTools) {
     toolWarnings.push({
       type: 'unsupported',
       feature: `combination of function and provider-defined tools`,
     });
   }
 
-  if (hasProviderDefinedTools) {
+  if (hasProviderTools) {
     const googleTools: any[] = [];
 
-    const providerDefinedTools = tools.filter(
-      tool => tool.type === 'provider-defined',
-    );
-    providerDefinedTools.forEach(tool => {
+    const ProviderTools = tools.filter(tool => tool.type === 'provider');
+    ProviderTools.forEach(tool => {
       switch (tool.id) {
         case 'google.google_search':
           if (isGemini2orNewer) {
-            googleTools.push({ googleSearch: {} });
-          } else if (supportsDynamicRetrieval) {
-            // For non-Gemini-2 models that don't support dynamic retrieval, use basic googleSearchRetrieval
-            googleTools.push({
-              googleSearchRetrieval: {
-                dynamicRetrievalConfig: {
-                  mode: tool.args.mode as
-                    | 'MODE_DYNAMIC'
-                    | 'MODE_UNSPECIFIED'
-                    | undefined,
-                  dynamicThreshold: tool.args.dynamicThreshold as
-                    | number
-                    | undefined,
-                },
-              },
-            });
+            googleTools.push({ googleSearch: { ...tool.args } });
           } else {
-            googleTools.push({ googleSearchRetrieval: {} });
+            toolWarnings.push({
+              type: 'unsupported',
+              feature: `provider-defined tool ${tool.id}`,
+              details: 'Google Search requires Gemini 2.0 or newer.',
+            });
+          }
+          break;
+        case 'google.enterprise_web_search':
+          if (isGemini2orNewer) {
+            googleTools.push({ enterpriseWebSearch: {} });
+          } else {
+            toolWarnings.push({
+              type: 'unsupported',
+              feature: `provider-defined tool ${tool.id}`,
+              details: 'Enterprise Web Search requires Gemini 2.0 or newer.',
+            });
           }
           break;
         case 'google.url_context':
@@ -134,7 +132,7 @@ export function prepareTools({
               type: 'unsupported',
               feature: `provider-defined tool ${tool.id}`,
               details:
-                'The file search tool is only supported with Gemini 2.5 models.',
+                'The file search tool is only supported with Gemini 2.5 models and Gemini 3 models.',
             });
           }
           break;
@@ -159,6 +157,18 @@ export function prepareTools({
             });
           }
           break;
+        case 'google.google_maps':
+          if (isGemini2orNewer) {
+            googleTools.push({ googleMaps: {} });
+          } else {
+            toolWarnings.push({
+              type: 'unsupported',
+              feature: `provider-defined tool ${tool.id}`,
+              details:
+                'The Google Maps grounding tool is not supported with Gemini models other than Gemini 2 or newer.',
+            });
+          }
+          break;
         default:
           toolWarnings.push({
             type: 'unsupported',
@@ -176,6 +186,7 @@ export function prepareTools({
   }
 
   const functionDeclarations = [];
+  let hasStrictTools = false;
   for (const tool of tools) {
     switch (tool.type) {
       case 'function':
@@ -184,6 +195,9 @@ export function prepareTools({
           description: tool.description ?? '',
           parameters: convertJSONSchemaToOpenAPISchema(tool.inputSchema),
         });
+        if (tool.strict === true) {
+          hasStrictTools = true;
+        }
         break;
       default:
         toolWarnings.push({
@@ -197,7 +211,9 @@ export function prepareTools({
   if (toolChoice == null) {
     return {
       tools: [{ functionDeclarations }],
-      toolConfig: undefined,
+      toolConfig: hasStrictTools
+        ? { functionCallingConfig: { mode: 'VALIDATED' } }
+        : undefined,
       toolWarnings,
     };
   }
@@ -208,7 +224,11 @@ export function prepareTools({
     case 'auto':
       return {
         tools: [{ functionDeclarations }],
-        toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+        toolConfig: {
+          functionCallingConfig: {
+            mode: hasStrictTools ? 'VALIDATED' : 'AUTO',
+          },
+        },
         toolWarnings,
       };
     case 'none':
@@ -220,7 +240,11 @@ export function prepareTools({
     case 'required':
       return {
         tools: [{ functionDeclarations }],
-        toolConfig: { functionCallingConfig: { mode: 'ANY' } },
+        toolConfig: {
+          functionCallingConfig: {
+            mode: hasStrictTools ? 'VALIDATED' : 'ANY',
+          },
+        },
         toolWarnings,
       };
     case 'tool':
@@ -228,7 +252,7 @@ export function prepareTools({
         tools: [{ functionDeclarations }],
         toolConfig: {
           functionCallingConfig: {
-            mode: 'ANY',
+            mode: hasStrictTools ? 'VALIDATED' : 'ANY',
             allowedFunctionNames: [toolChoice.toolName],
           },
         },

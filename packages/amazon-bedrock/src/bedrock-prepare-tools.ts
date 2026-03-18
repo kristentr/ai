@@ -1,7 +1,7 @@
 import {
   JSONObject,
-  LanguageModelV3CallOptions,
-  SharedV3Warning,
+  LanguageModelV4CallOptions,
+  SharedV4Warning,
   UnsupportedFunctionalityError,
 } from '@ai-sdk/provider';
 import { asSchema } from '@ai-sdk/provider-utils';
@@ -16,16 +16,16 @@ export async function prepareTools({
   toolChoice,
   modelId,
 }: {
-  tools: LanguageModelV3CallOptions['tools'];
-  toolChoice?: LanguageModelV3CallOptions['toolChoice'];
+  tools: LanguageModelV4CallOptions['tools'];
+  toolChoice?: LanguageModelV4CallOptions['toolChoice'];
   modelId: string;
 }): Promise<{
   toolConfig: BedrockToolConfiguration;
   additionalTools: Record<string, unknown> | undefined;
   betas: Set<string>;
-  toolWarnings: SharedV3Warning[];
+  toolWarnings: SharedV4Warning[];
 }> {
-  const toolWarnings: SharedV3Warning[] = [];
+  const toolWarnings: SharedV4Warning[] = [];
   const betas = new Set<string>();
 
   if (tools == null || tools.length === 0) {
@@ -40,7 +40,7 @@ export async function prepareTools({
   // Filter out unsupported web_search tool and add a warning
   const supportedTools = tools.filter(tool => {
     if (
-      tool.type === 'provider-defined' &&
+      tool.type === 'provider' &&
       tool.id === 'anthropic.web_search_20250305'
     ) {
       toolWarnings.push({
@@ -64,36 +64,25 @@ export async function prepareTools({
   }
 
   const isAnthropicModel = modelId.includes('anthropic.');
-  const providerDefinedTools = supportedTools.filter(
-    t => t.type === 'provider-defined',
-  );
+  const ProviderTools = supportedTools.filter(t => t.type === 'provider');
   const functionTools = supportedTools.filter(t => t.type === 'function');
 
   let additionalTools: Record<string, unknown> | undefined = undefined;
   const bedrockTools: BedrockTool[] = [];
 
-  const usingAnthropicTools =
-    isAnthropicModel && providerDefinedTools.length > 0;
+  const usingAnthropicTools = isAnthropicModel && ProviderTools.length > 0;
 
   // Handle Anthropic provider-defined tools for Anthropic models on Bedrock
   if (usingAnthropicTools) {
-    if (functionTools.length > 0) {
-      toolWarnings.push({
-        type: 'unsupported',
-        feature:
-          'mixing Anthropic provider-defined tools and standard function tools',
-        details:
-          'Mixed Anthropic provider-defined tools and standard function tools are not supported in a single call to Bedrock. Only Anthropic tools will be used.',
-      });
-    }
-
     const {
       toolChoice: preparedAnthropicToolChoice,
       toolWarnings: anthropicToolWarnings,
       betas: anthropicBetas,
     } = await prepareAnthropicTools({
-      tools: providerDefinedTools,
+      tools: ProviderTools,
       toolChoice,
+      supportsStructuredOutput: false,
+      supportsStrictTools: false,
     });
 
     toolWarnings.push(...anthropicToolWarnings);
@@ -108,7 +97,7 @@ export async function prepareTools({
     }
 
     // Create a standard Bedrock tool representation for validation purposes
-    for (const tool of providerDefinedTools) {
+    for (const tool of ProviderTools) {
       const toolFactory = Object.values(anthropicTools).find(factory => {
         const instance = (factory as (args: any) => any)({});
         return instance.id === tool.id;
@@ -131,19 +120,24 @@ export async function prepareTools({
     }
   } else {
     // Report unsupported provider-defined tools for non-anthropic models
-    for (const tool of providerDefinedTools) {
+    for (const tool of ProviderTools) {
       toolWarnings.push({ type: 'unsupported', feature: `tool ${tool.id}` });
     }
   }
 
-  // Handle standard function tools for all models
-  for (const tool of functionTools) {
+  const filteredFunctionTools =
+    toolChoice?.type === 'tool'
+      ? functionTools.filter(t => t.name === toolChoice.toolName)
+      : functionTools;
+
+  for (const tool of filteredFunctionTools) {
     bedrockTools.push({
       toolSpec: {
         name: tool.name,
         ...(tool.description?.trim() !== ''
           ? { description: tool.description }
           : {}),
+        ...(tool.strict != null ? { strict: tool.strict } : {}),
         inputSchema: {
           json: tool.inputSchema as JSONObject,
         },
